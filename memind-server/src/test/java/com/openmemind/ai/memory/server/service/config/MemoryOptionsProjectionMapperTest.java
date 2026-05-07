@@ -28,16 +28,122 @@ class MemoryOptionsProjectionMapperTest {
     void mapsCanonicalOptionsToGroupedProjection() {
         var projection = mapper.toProjection(MemoryBuildOptions.defaults());
 
-        assertThat(projection).containsKeys("extraction", "retrieval");
-        assertThat(projection.get("extraction"))
+        assertThat(projection)
+                .containsKeys(
+                        "extraction.common",
+                        "extraction.rawdata",
+                        "extraction.item",
+                        "extraction.itemGraph",
+                        "extraction.insight",
+                        "retrieval.common",
+                        "retrieval.simple",
+                        "retrieval.simpleGraphAssist",
+                        "retrieval.simpleThreadAssist",
+                        "retrieval.deep",
+                        "retrieval.deepGraphAssist",
+                        "retrieval.deepThreadAssist",
+                        "retrieval.rerank",
+                        "retrieval.scoring",
+                        "memoryThread.lifecycle",
+                        "memoryThread.enrichment")
+                .doesNotContainKeys("extraction", "retrieval", "memoryThread");
+        assertThat(projection.get("extraction.common"))
+                .extracting(MemoryOptionItemView::key)
+                .containsExactly(
+                        "extraction.common.defaultScope",
+                        "extraction.common.timeout",
+                        "extraction.common.language");
+        assertThat(projection.get("extraction.rawdata"))
                 .extracting(MemoryOptionItemView::key)
                 .contains(
-                        "extraction.common.timeout",
                         "extraction.rawdata.conversation.messagesPerChunk",
                         "extraction.rawdata.vectorBatchSize");
-        assertThat(projection.get("retrieval"))
+        assertThat(projection.get("retrieval.simple"))
                 .extracting(MemoryOptionItemView::key)
-                .contains("retrieval.simple.timeout", "retrieval.advanced.rerank.mode");
+                .contains("retrieval.simple.timeout", "retrieval.simple.itemTopK");
+        assertThat(projection.get("retrieval.rerank"))
+                .extracting(MemoryOptionItemView::key)
+                .contains("retrieval.advanced.rerank.mode");
+    }
+
+    @Test
+    void projectsDirectlyEditableTypesForAdminEditors() {
+        var projection = mapper.toProjection(MemoryBuildOptions.defaults());
+
+        MemoryOptionItemView defaultScope = findItem(projection, "extraction.common.defaultScope");
+        assertThat(defaultScope.type()).isEqualTo("string");
+        assertThat(defaultScope.value()).isEqualTo("USER");
+        assertThat(defaultScope.defaultValue()).isEqualTo("USER");
+        assertThat(defaultScope.constraints())
+                .containsEntry("allowedValues", java.util.List.of("USER", "AGENT"));
+
+        MemoryOptionItemView timeout = findItem(projection, "extraction.common.timeout");
+        assertThat(timeout.type()).isEqualTo("string");
+        assertThat(timeout.value()).isInstanceOf(String.class);
+        assertThat(timeout.constraints()).containsEntry("format", "iso-8601-duration");
+
+        MemoryOptionItemView threshold =
+                findItem(projection, "retrieval.simple.graphAssist.graphChannelWeight");
+        assertThat(threshold.type()).isEqualTo("double");
+    }
+
+    @Test
+    void groupsRuntimeOptionsByAdminEditingDomain() {
+        var projection = mapper.toProjection(MemoryBuildOptions.defaults());
+
+        assertThat(projection.get("extraction.itemGraph"))
+                .extracting(MemoryOptionItemView::key)
+                .contains(
+                        "extraction.item.graph.enabled",
+                        "extraction.item.graph.maxEntitiesPerItem",
+                        "extraction.item.graph.supportedLanguagePacks",
+                        "extraction.item.graph.userAliasDictionary.enabled");
+        assertThat(projection.get("extraction.insight"))
+                .extracting(MemoryOptionItemView::key)
+                .contains(
+                        "extraction.insight.enabled",
+                        "extraction.insight.build.groupingThreshold",
+                        "extraction.insight.graphAssist.enabled");
+        assertThat(projection.get("retrieval.simpleGraphAssist"))
+                .extracting(MemoryOptionItemView::key)
+                .contains(
+                        "retrieval.simple.graphAssist.enabled",
+                        "retrieval.simple.graphAssist.maxSeedItems",
+                        "retrieval.simple.graphAssist.mode");
+        assertThat(projection.get("retrieval.deepGraphAssist"))
+                .extracting(MemoryOptionItemView::key)
+                .contains(
+                        "retrieval.deep.graphAssist.enabled",
+                        "retrieval.deep.graphAssist.maxSeedItems",
+                        "retrieval.deep.graphAssist.mode");
+        assertThat(projection.get("retrieval.simpleThreadAssist"))
+                .extracting(MemoryOptionItemView::key)
+                .contains(
+                        "retrieval.simple.memoryThreadAssist.enabled",
+                        "retrieval.simple.memoryThreadAssist.maxThreads");
+        assertThat(projection.get("retrieval.deepThreadAssist"))
+                .extracting(MemoryOptionItemView::key)
+                .contains(
+                        "retrieval.deep.memoryThreadAssist.enabled",
+                        "retrieval.deep.memoryThreadAssist.maxThreads");
+        assertThat(projection.get("retrieval.scoring"))
+                .extracting(MemoryOptionItemView::key)
+                .contains(
+                        "retrieval.advanced.scoring.fusion.k",
+                        "retrieval.advanced.scoring.timeDecay.rate",
+                        "retrieval.advanced.scoring.keywordSearch.probeTopK");
+        assertThat(projection.get("memoryThread.lifecycle"))
+                .extracting(MemoryOptionItemView::key)
+                .contains(
+                        "memoryThread.enabled",
+                        "memoryThread.derivation.enabled",
+                        "memoryThread.rule.matchThreshold",
+                        "memoryThread.lifecycle.dormantAfter");
+        assertThat(projection.get("memoryThread.enrichment"))
+                .extracting(MemoryOptionItemView::key)
+                .contains(
+                        "memoryThread.enrichment.enabled",
+                        "memoryThread.enrichment.minimumWallClockGapBetweenRuns");
     }
 
     @Test
@@ -58,18 +164,21 @@ class MemoryOptionsProjectionMapperTest {
     void projectionExposesInsightGraphAssistKeysAndRoundTripsValues() {
         var projection = mapper.toProjection(MemoryBuildOptions.defaults());
 
-        assertThat(projection.get("extraction"))
+        assertThat(projection.get("extraction.itemGraph"))
                 .extracting(MemoryOptionItemView::key)
                 .contains(
                         "extraction.item.graph.enabled",
                         "extraction.item.graph.semanticSearchHeadroom",
                         "extraction.item.graph.semanticLinkConcurrency",
-                        "extraction.item.graph.semanticSourceWindowSize",
+                        "extraction.item.graph.semanticSourceWindowSize");
+        assertThat(projection.get("extraction.insight"))
+                .extracting(MemoryOptionItemView::key)
+                .contains(
                         "extraction.insight.graphAssist.enabled",
                         "extraction.insight.graphAssist.maxContextChars");
 
         assertThat(
-                        projection.get("extraction").stream()
+                        projection.get("extraction.itemGraph").stream()
                                 .filter(
                                         item ->
                                                 item.key()
@@ -101,7 +210,7 @@ class MemoryOptionsProjectionMapperTest {
     void projectionExposesRetrievalGraphAssistKeys() {
         var projection = mapper.toProjection(MemoryBuildOptions.defaults());
 
-        assertThat(projection.get("retrieval"))
+        assertThat(projection.get("retrieval.simpleGraphAssist"))
                 .extracting(MemoryOptionItemView::key)
                 .contains(
                         "retrieval.simple.graphAssist.enabled",
@@ -135,7 +244,7 @@ class MemoryOptionsProjectionMapperTest {
     void projectionExposesDeepRetrievalGraphAssistKeysAndRoundTripsValues() {
         var projection = mapper.toProjection(MemoryBuildOptions.defaults());
 
-        assertThat(projection.get("retrieval"))
+        assertThat(projection.get("retrieval.deepGraphAssist"))
                 .extracting(MemoryOptionItemView::key)
                 .contains(
                         "retrieval.deep.graphAssist.enabled",
@@ -143,7 +252,7 @@ class MemoryOptionsProjectionMapperTest {
                         "retrieval.deep.graphAssist.semanticEvidenceDecayFactor",
                         "retrieval.deep.graphAssist.timeout");
         assertThat(
-                        projection.get("retrieval").stream()
+                        projection.get("retrieval.deepGraphAssist").stream()
                                 .filter(
                                         item ->
                                                 item.key()
@@ -175,8 +284,8 @@ class MemoryOptionsProjectionMapperTest {
     void projectionExposesMemoryThreadKeysAndRoundTripsValues() {
         var projection = mapper.toProjection(MemoryBuildOptions.defaults());
 
-        assertThat(projection).containsKey("memoryThread");
-        assertThat(projection.get("memoryThread"))
+        assertThat(projection).containsKey("memoryThread.lifecycle");
+        assertThat(projection.get("memoryThread.lifecycle"))
                 .extracting(MemoryOptionItemView::key)
                 .contains(
                         "memoryThread.enabled",
@@ -184,11 +293,12 @@ class MemoryOptionsProjectionMapperTest {
                         "memoryThread.rule.maxCandidateThreads",
                         "memoryThread.rule.maxRetrievalMembersPerThread",
                         "memoryThread.lifecycle.dormantAfter");
-        assertThat(projection.get("retrieval"))
+        assertThat(projection.get("retrieval.simpleThreadAssist"))
                 .extracting(MemoryOptionItemView::key)
-                .contains(
-                        "retrieval.simple.memoryThreadAssist.enabled",
-                        "retrieval.deep.memoryThreadAssist.enabled");
+                .contains("retrieval.simple.memoryThreadAssist.enabled");
+        assertThat(projection.get("retrieval.deepThreadAssist"))
+                .extracting(MemoryOptionItemView::key)
+                .contains("retrieval.deep.memoryThreadAssist.enabled");
 
         updateValue(projection, "memoryThread.enabled", true);
         updateValue(projection, "memoryThread.derivation.enabled", true);
@@ -212,7 +322,7 @@ class MemoryOptionsProjectionMapperTest {
     void projectionExposesMemoryThreadEnrichmentKeysAndRoundTripsValues() {
         var projection = mapper.toProjection(MemoryBuildOptions.defaults());
 
-        assertThat(projection.get("memoryThread"))
+        assertThat(projection.get("memoryThread.enrichment"))
                 .extracting(MemoryOptionItemView::key)
                 .contains(
                         "memoryThread.enrichment.enabled",
