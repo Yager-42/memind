@@ -26,8 +26,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ingest import retry_root, state_root
 from lib.client import MemindClient
 from lib.config import load_config
+from lib.identity import project_slug, resolve_identity
 from lib.logging_utils import debug_log
 from lib.retry import RetrySpool
+from lib.session_context import build_session_context, render_session_context
 from lib.state import SessionStateStore
 
 
@@ -39,60 +41,57 @@ def _tcp_check(url, timeout=1):
         return True
 
 
-async def _replay_ingestion_batch(client, payload):
-    session_key = payload.get("sessionKey")
-    fingerprints = payload.get("fingerprints") or []
-    operations = payload.get("operations") or []
-    store = SessionStateStore(state_root())
-    appended = 0
-    for index, operation in enumerate(operations):
-        if operation.get("kind") != "add-message":
-            continue
-        fingerprint = fingerprints[index] if index < len(fingerprints) else None
-        if fingerprint and session_key:
-            with store.locked(session_key) as state:
-                if state.is_submitted(fingerprint):
-                    continue
-        await client.add_message(
-            operation["userId"],
-            operation["agentId"],
-            operation["message"],
-            operation.get("sourceClient"),
-        )
-        appended += 1
-        if fingerprint and session_key:
-            store.mark_submitted(session_key, [fingerprint])
-    if appended and payload.get("commitOnSuccess"):
-        await client.commit(payload["userId"], payload["agentId"], payload.get("sourceClient"))
-    return appended
-
-
 async def _replay_payload(client, payload):
     kind = payload.get("kind")
     if kind == "extract":
+        raw_content = payload.get("rawContent") or {}
+        if raw_content.get("type") != "agent_timeline":
+            return 0
         response = await client.extract(
             payload["userId"],
             payload["agentId"],
-            payload["rawContent"],
+            raw_content,
             payload.get("sourceClient"),
         )
         status = getattr(response, "status", None)
         if status != "SUCCESS":
             raise RuntimeError(f"extract replay did not fully succeed: {status}")
         session_key = payload.get("sessionKey")
-        fingerprints = payload.get("fingerprints") or []
-        if session_key and fingerprints:
-            SessionStateStore(state_root()).mark_submitted(session_key, fingerprints)
-        return len(fingerprints)
-    if kind == "ingestion-batch":
-        return await _replay_ingestion_batch(client, payload)
+        event_ids = payload.get("eventIds") or []
+        if session_key and event_ids:
+            SessionStateStore(state_root()).clear_agent_events(session_key, event_ids)
+        return 0
     if kind == "commit":
         await client.commit(payload["userId"], payload["agentId"], payload.get("sourceClient"))
         return 0
     return 0
 
 
-async def run_session_start_async(config):
+def _base_output():
+    return {"continue": True, "suppressOutput": True}
+
+
+def _context_output(client, config, hook_input):
+    if not config.get("autoSessionContext", True):
+        return None
+    cwd = hook_input.get("cwd") or os.getcwd()
+    identity = resolve_identity(config, hook_input)
+    slug = project_slug(cwd)
+    context = build_session_context(client, identity, slug, config)
+    rendered = render_session_context(context, config)
+    if not rendered:
+        return None
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "SessionStart",
+            "additionalContext": rendered,
+        }
+    }
+
+
+async def run_session_start_async(config, hook_input=None):
+    hook_input = hook_input or {}
+    output = _base_output()
     try:
         client = MemindClient(config["memindApiUrl"], config.get("memindApiToken"), timeout=2, max_retries=0)
         try:
@@ -101,7 +100,7 @@ async def run_session_start_async(config):
             _tcp_check(config["memindApiUrl"], timeout=1)
     except Exception as exc:
         debug_log(config, "session_start_health_failed", {"error": str(exc)})
-        return
+        return output
 
     spool = RetrySpool(retry_root())
     claimed = None
@@ -125,22 +124,34 @@ async def run_session_start_async(config):
         SessionStateStore(state_root()).cleanup(int(config.get("stateMaxAgeDays", 14)))
     except Exception as exc:
         debug_log(config, "state_cleanup_failed", {"error": str(exc)})
+    try:
+        context_output = _context_output(client, config, hook_input)
+        if context_output:
+            output.update(context_output)
+    except Exception as exc:
+        debug_log(config, "session_context_failed", {"error": str(exc)})
+    return output
 
 
-def run_session_start(config):
-    asyncio.run(run_session_start_async(config))
+def run_session_start(config, hook_input=None):
+    return asyncio.run(run_session_start_async(config, hook_input))
 
 
 def main():
     try:
         config = load_config()
-        run_session_start(config)
+        try:
+            hook_input = json.loads(sys.stdin.read() or "{}")
+        except Exception:
+            hook_input = {}
+        output = run_session_start(config, hook_input)
     except Exception as exc:
         try:
             debug_log(load_config(), "session_start_failed", {"error": str(exc)})
         except Exception:
             pass
-    print(json.dumps({"continue": True, "suppressOutput": True}))
+        output = _base_output()
+    print(json.dumps(output))
 
 
 if __name__ == "__main__":

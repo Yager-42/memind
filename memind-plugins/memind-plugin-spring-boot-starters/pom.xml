@@ -34,6 +34,7 @@
         <module>memind-plugin-jdbc-starter</module>
         <module>memind-plugin-mybatis-plus-starter</module>
         <module>memind-plugin-rawdata-audio-starter</module>
+        <module>memind-plugin-rawdata-agent-starter</module>
         <module>memind-plugin-rawdata-document-starter</module>
         <module>memind-plugin-rawdata-image-starter</module>
         <module>memind-plugin-rawdata-jackson-starter</module>

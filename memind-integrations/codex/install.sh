@@ -99,6 +99,9 @@ required = [
     "MemindClient",
     "ConversationContent",
     "Message",
+    "QueryMemoryItemsRequest",
+    "QueryMemoryRawDataRequest",
+    "RawDataQueryIncludeOptions",
     "Strategy",
 ]
 missing = [name for name in required if not hasattr(memind, name)]
@@ -177,16 +180,23 @@ download_remote_install() {
     "hooks/hooks.json"
     "scripts/install_codex_hooks.py"
     "scripts/ingest.py"
+    "scripts/pre_tool_use.py"
+    "scripts/post_tool_use.py"
     "scripts/retrieve.py"
     "scripts/session_start.py"
     "scripts/lib/__init__.py"
+    "scripts/lib/agent_timeline.py"
     "scripts/lib/client.py"
     "scripts/lib/config.py"
+    "scripts/lib/context_compiler.py"
     "scripts/lib/content.py"
     "scripts/lib/identity.py"
     "scripts/lib/logging_utils.py"
+    "scripts/lib/prompt_context.py"
     "scripts/lib/retry.py"
+    "scripts/lib/session_context.py"
     "scripts/lib/state.py"
+    "scripts/lib/tool_context.py"
   )
   mkdir -p "${INSTALL_ROOT}"
   rm -rf "${INSTALL_ROOT}/scripts" "${INSTALL_ROOT}/hooks" "${INSTALL_ROOT}/.codex-plugin"

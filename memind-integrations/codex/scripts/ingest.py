@@ -23,8 +23,13 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from lib.client import MemindClient
+from lib.agent_timeline import (
+    build_timeline_payload,
+    normalize_assistant_message_event,
+    normalize_stop_event,
+)
 from lib.config import load_config
-from lib.content import extract_messages
+from lib.content import read_last_assistant_message
 from lib.identity import resolve_identity
 from lib.logging_utils import debug_log
 from lib.retry import RetrySpool
@@ -32,26 +37,21 @@ from lib.state import SessionStateStore, state_key
 
 
 def state_root():
+    override = os.environ.get("MEMIND_CODEX_STATE_ROOT")
+    if override:
+        return Path(override)
     return Path.home() / ".memind" / "codex" / "state"
 
 
 def retry_root():
+    override = os.environ.get("MEMIND_CODEX_RETRY_ROOT")
+    if override:
+        return Path(override)
     return Path.home() / ".memind" / "codex" / "retry"
 
 
-def _message_payload(raw_message):
-    return {key: value for key, value in raw_message.items() if key != "fingerprint"}
-
-
-def _extract_payload(messages):
-    return {
-        "type": "conversation",
-        "messages": [_message_payload(message) for message in messages],
-    }
-
-
-def _spool_extract(retry_spool, identity, source_client, session_key, messages):
-    if retry_spool is None or not messages:
+def _spool_agent_timeline(retry_spool, identity, source_client, session_key, events, raw_content):
+    if retry_spool is None or not events:
         return
     retry_spool.enqueue(
         {
@@ -60,49 +60,98 @@ def _spool_extract(retry_spool, identity, source_client, session_key, messages):
             "agentId": identity["agentId"],
             "sourceClient": source_client,
             "sessionKey": session_key,
-            "fingerprints": [message["fingerprint"] for message in messages],
-            "rawContent": _extract_payload(messages),
+            "eventIds": [event["eventId"] for event in events if event.get("eventId")],
+            "rawContent": raw_content,
         }
     )
+
+
+def _is_stop_hook(hook_input):
+    return (hook_input.get("hook_event_name") or "") == "Stop"
+
+
+def _append_stop_events(state, session_key, hook_input):
+    if not _is_stop_hook(hook_input):
+        return None
+    turn_id, turn_seq = state.ensure_agent_turn(session_key)
+    assistant_text = read_last_assistant_message(hook_input.get("transcript_path"))
+    if assistant_text:
+        seq = state.next_agent_seq()
+        state.append_agent_event(
+            normalize_assistant_message_event(
+                hook_input, seq, turn_id=turn_id, turn_seq=turn_seq, text=assistant_text
+            )
+        )
+    seq = state.next_agent_seq()
+    state.append_agent_event(
+        normalize_stop_event(hook_input, seq, turn_id=turn_id, turn_seq=turn_seq)
+    )
+    return turn_id
 
 
 async def ingest_messages_async(config, hook_input):
     identity = resolve_identity(config, hook_input)
     client = MemindClient(config["memindApiUrl"], config.get("memindApiToken"), timeout=10, max_retries=0)
-    transcript_path = hook_input.get("transcript_path")
-    messages = []
-    if config.get("autoIngest", True) and transcript_path and Path(transcript_path).exists():
-        messages = extract_messages(transcript_path, config.get("ingestionRoles", ["user", "assistant"]))
 
-    limit = int(config.get("ingestionMaxMessagesPerHook", 20))
     retry_spool = RetrySpool(retry_root()) if config.get("ingestRetrySpool", True) else None
     store = SessionStateStore(state_root())
     session_key = state_key(hook_input)
     source_client = config.get("sourceClient")
+    agent_events_submitted = 0
+    submitted_turn_id = None
 
     with store.locked(session_key) as state:
-        selected = [message for message in messages if not state.is_submitted(message["fingerprint"])][:limit]
+        if config.get("autoIngestAgentTimeline", True):
+            hook_input["source_client"] = source_client or "codex"
+            submitted_turn_id = _append_stop_events(state, session_key, hook_input)
+            agent_events = state.agent_events()
+        else:
+            agent_events = []
 
-    submitted = []
-    if selected:
+    if agent_events:
+        timeline_payload = build_timeline_payload(
+            config,
+            identity,
+            session_key,
+            agent_events,
+            hook_input,
+        )
         try:
             response = await client.extract(
                 identity["userId"],
                 identity["agentId"],
-                _extract_payload(selected),
+                timeline_payload,
                 source_client,
             )
         except Exception:
-            _spool_extract(retry_spool, identity, source_client, session_key, selected)
+            _spool_agent_timeline(
+                retry_spool,
+                identity,
+                source_client,
+                session_key,
+                agent_events,
+                timeline_payload,
+            )
         else:
             status = getattr(response, "status", None)
             if status == "SUCCESS":
-                submitted = [message["fingerprint"] for message in selected]
-                store.mark_submitted(session_key, submitted)
+                agent_events_submitted = len(agent_events)
+                with store.locked(session_key) as state:
+                    state.clear_agent_events(
+                        [event["eventId"] for event in agent_events if event.get("eventId")]
+                    )
+                    state.close_agent_turn(submitted_turn_id)
             else:
-                _spool_extract(retry_spool, identity, source_client, session_key, selected)
+                _spool_agent_timeline(
+                    retry_spool,
+                    identity,
+                    source_client,
+                    session_key,
+                    agent_events,
+                    timeline_payload,
+                )
 
-    return {"submitted": len(submitted), "committed": False}
+    return {"agentEventsSubmitted": agent_events_submitted, "committed": False}
 
 
 def ingest_messages(config, hook_input):

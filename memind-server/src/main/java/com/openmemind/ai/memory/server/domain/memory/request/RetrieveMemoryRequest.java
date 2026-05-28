@@ -16,16 +16,40 @@ package com.openmemind.ai.memory.server.domain.memory.request;
 import com.openmemind.ai.memory.core.retrieval.RetrievalConfig;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.time.Instant;
+import java.util.List;
 
 public record RetrieveMemoryRequest(
         @NotBlank String userId,
         @NotBlank String agentId,
         @NotBlank String query,
         @NotNull RetrievalConfig.Strategy strategy,
-        Boolean trace) {
+        Boolean trace,
+        String scope,
+        List<String> categories,
+        TimeRange timeRange,
+        MetadataFilter metadataFilter,
+        IncludeOptions include) {
+
+    public RetrieveMemoryRequest {
+        categories = categories == null ? List.of() : List.copyOf(categories);
+    }
 
     public RetrieveMemoryRequest(
             String userId, String agentId, String query, RetrievalConfig.Strategy strategy) {
         this(userId, agentId, query, strategy, null);
     }
+
+    public RetrieveMemoryRequest(
+            String userId,
+            String agentId,
+            String query,
+            RetrievalConfig.Strategy strategy,
+            Boolean trace) {
+        this(userId, agentId, query, strategy, trace, null, List.of(), null, null, null);
+    }
+
+    public record TimeRange(String field, Instant from, Instant to) {}
+
+    public record IncludeOptions(Boolean rawDataMetadata, Boolean rawDataSegment) {}
 }

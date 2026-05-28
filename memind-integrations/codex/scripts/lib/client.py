@@ -59,8 +59,37 @@ class MemindClient:
                 source_client=source_client,
             )
 
-    def retrieve(self, user_id, agent_id, query, strategy="SIMPLE", trace=False):
-        from memind import MemindClient as OfficialMemindClient
+    def retrieve(
+        self,
+        user_id,
+        agent_id,
+        query,
+        strategy="SIMPLE",
+        trace=False,
+        scope=None,
+        categories=None,
+        time_range=None,
+        metadata_filter=None,
+        include=None,
+    ):
+        from memind import (
+            MemindClient as OfficialMemindClient,
+            MetadataFilter,
+            RetrieveIncludeOptions,
+            TimeRange,
+        )
+
+        metadata_filter_obj = (
+            MetadataFilter(**metadata_filter)
+            if isinstance(metadata_filter, dict)
+            else metadata_filter
+        )
+        include_obj = (
+            RetrieveIncludeOptions(**include)
+            if isinstance(include, dict)
+            else include
+        )
+        time_range_obj = TimeRange(**time_range) if isinstance(time_range, dict) else time_range
 
         with OfficialMemindClient(
             base_url=self.base_url,
@@ -74,4 +103,84 @@ class MemindClient:
                 query=query,
                 strategy=strategy,
                 trace=trace,
+                scope=scope,
+                categories=categories,
+                time_range=time_range_obj,
+                metadata_filter=metadata_filter_obj,
+                include=include_obj,
             )
+
+    def query_items(
+        self,
+        user_id,
+        agent_id,
+        scope=None,
+        categories=None,
+        source_clients=None,
+        raw_data_types=None,
+        time_range=None,
+        metadata_filter=None,
+        limit=None,
+        cursor=None,
+    ):
+        from memind import MemindClient as OfficialMemindClient
+        from memind import QueryMemoryItemsRequest
+
+        request = QueryMemoryItemsRequest(
+            user_id=user_id,
+            agent_id=agent_id,
+            scope=scope,
+            categories=categories,
+            source_clients=source_clients,
+            raw_data_types=raw_data_types,
+            time_range=time_range,
+            metadata_filter=metadata_filter,
+            limit=limit,
+            cursor=cursor,
+        )
+        with OfficialMemindClient(
+            base_url=self.base_url,
+            api_token=self.token,
+            timeout=self.timeout,
+            max_retries=self.max_retries,
+        ) as client:
+            return client.memory.query_items(request)
+
+    def query_raw_data(
+        self,
+        user_id,
+        agent_id,
+        types=None,
+        source_clients=None,
+        time_range=None,
+        metadata_filter=None,
+        include=None,
+        limit=None,
+        cursor=None,
+    ):
+        from memind import MemindClient as OfficialMemindClient
+        from memind import QueryMemoryRawDataRequest, RawDataQueryIncludeOptions
+
+        include_options = (
+            RawDataQueryIncludeOptions(**include)
+            if isinstance(include, dict)
+            else include
+        )
+        request = QueryMemoryRawDataRequest(
+            user_id=user_id,
+            agent_id=agent_id,
+            types=types,
+            source_clients=source_clients,
+            time_range=time_range,
+            metadata_filter=metadata_filter,
+            include=include_options,
+            limit=limit,
+            cursor=cursor,
+        )
+        with OfficialMemindClient(
+            base_url=self.base_url,
+            api_token=self.token,
+            timeout=self.timeout,
+            max_retries=self.max_retries,
+        ) as client:
+            return client.memory.query_raw_data(request)

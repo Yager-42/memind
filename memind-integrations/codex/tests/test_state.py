@@ -25,32 +25,70 @@ class StateTest(unittest.TestCase):
     def test_state_key_prefers_session_id(self):
         self.assertEqual(state_key({"session_id": "abc/def"}), "abc_def")
 
-    def test_state_key_falls_back_to_transcript_path(self):
-        key = state_key({"transcript_path": "/tmp/codex/transcript.jsonl"})
-        self.assertTrue(key.startswith("transcript-"))
+    def test_state_key_falls_back_to_cwd(self):
+        key = state_key({"transcript_path": "/tmp/codex/transcript.jsonl", "cwd": "/tmp/project"})
+        self.assertTrue(key.startswith("cwd-"))
 
-    def test_marks_and_loads_submitted_fingerprints(self):
+    def test_agent_events_are_deduplicated_and_clear_by_event_id(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = SessionStateStore(Path(tmp))
             with store.locked("session-1") as state:
-                state.mark_submitted(["a", "b"])
+                self.assertEqual(state.next_agent_seq(), 1)
+                self.assertEqual(state.next_agent_seq(), 2)
+                state.append_agent_event({"eventId": "e1", "seq": 1})
+                state.append_agent_event({"eventId": "e1", "seq": 1})
+                state.append_agent_event({"eventId": "e2", "seq": 2})
+                state.clear_agent_events(["e1"])
             with store.locked("session-1") as state:
-                self.assertTrue(state.is_submitted("a"))
-                self.assertFalse(state.is_submitted("c"))
+                self.assertEqual(state.agent_events(), [{"eventId": "e2", "seq": 2}])
 
-    def test_mark_submitted_persists_immediately(self):
+    def test_state_reports_empty_after_all_events_are_cleared_and_turn_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = SessionStateStore(Path(tmp))
-            store.mark_submitted("session-1", ["a"])
+            session_key = "session-1"
+            with store.locked(session_key) as state:
+                turn_id, _turn_seq = state.start_agent_turn(session_key)
+                state.append_agent_event({"eventId": "e1", "seq": 1})
+                state.clear_agent_events(["e1"])
+                state.close_agent_turn(turn_id)
+                self.assertTrue(state.is_empty())
+
+    def test_agent_event_buffer_has_soft_cap(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = SessionStateStore(Path(tmp))
             with store.locked("session-1") as state:
-                self.assertTrue(state.is_submitted("a"))
+                for index in range(501):
+                    state.append_agent_event({"eventId": f"e{index}", "seq": index})
+            with store.locked("session-1") as state:
+                events = state.agent_events()
+                self.assertEqual(len(events), 500)
+                self.assertEqual(events[0]["eventId"], "e1")
+                self.assertTrue(state.data["agentEventsTruncated"])
+                self.assertEqual(state.data["agentEventsDropped"], 1)
+
+    def test_agent_event_buffer_soft_cap_preserves_newest_boundary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = SessionStateStore(Path(tmp))
+            with store.locked("session-1") as state:
+                state.append_agent_event({"eventId": "prompt", "seq": 1, "kind": "user_prompt"})
+                for index in range(600):
+                    state.append_agent_event(
+                        {"eventId": f"e{index}", "seq": index + 2, "kind": "tool_result"}
+                    )
+                state.append_agent_event({"eventId": "stop", "seq": 700, "kind": "stop"})
+            with store.locked("session-1") as state:
+                events = state.agent_events()
+                self.assertLessEqual(len(events), 500)
+                self.assertEqual(events[-1]["eventId"], "stop")
+                self.assertTrue(state.data["agentEventsTruncated"])
+                self.assertIn("agentEventsDropped", state.data)
 
     def test_cleanup_removes_old_state(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             store = SessionStateStore(root)
             with store.locked("old") as state:
-                state.mark_submitted(["x"])
+                state.append_agent_event({"eventId": "e1", "seq": 1})
             old_file = root / "old.json"
             old_time = time.time() - 30 * 86400
             os.utime(old_file, (old_time, old_time))

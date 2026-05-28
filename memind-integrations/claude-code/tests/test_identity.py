@@ -20,13 +20,18 @@ from scripts.lib.identity import project_slug, resolve_identity
 
 
 class IdentityTest(unittest.TestCase):
-    def test_resolve_identity_uses_project_slug(self):
+    def test_resolve_identity_uses_fixed_agent_id(self):
         with tempfile.TemporaryDirectory() as tmp:
-            identity = resolve_identity({"agentId": "claude-code", "agentIdMode": "project"}, {"cwd": tmp})
+            identity = resolve_identity({"agentId": "coding-agent"}, {"cwd": tmp})
         self.assertTrue(identity["userId"].startswith("local__"))
-        self.assertTrue(identity["agentId"].startswith("claude-code__"))
+        self.assertEqual(identity["agentId"], "coding-agent")
         self.assertNotIn(":", identity["userId"])
         self.assertNotIn(":", identity["agentId"])
+
+    def test_resolve_identity_defaults_to_shared_coding_agent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            identity = resolve_identity({}, {"cwd": tmp})
+        self.assertEqual(identity["agentId"], "coding-agent")
 
     def test_project_slug_has_stable_suffix(self):
         with tempfile.TemporaryDirectory() as tmp:

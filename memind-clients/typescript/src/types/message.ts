@@ -76,7 +76,37 @@ export type JsonObjectRawContent = {
   [key: string]: JsonValue
 }
 
-export type RawContentValue = ConversationContent | JsonObjectRawContent
+export type AgentTimelineEvent = {
+  eventId?: string
+  seq?: number
+  kind?: string
+  occurredAt?: string
+  text?: string
+  toolName?: string
+  input?: JsonValue
+  output?: JsonValue
+  status?: string
+  durationMs?: number
+  path?: string
+  operation?: string
+  command?: string
+  exitCode?: number
+  metadata?: Record<string, JsonValue>
+}
+
+export type AgentTimelineContent = {
+  type: 'agent_timeline'
+  sourceClient?: string
+  sourceVersion?: string
+  sessionId: string
+  agentTurnId: string
+  timelineId: string
+  events: AgentTimelineEvent[]
+  project?: Record<string, JsonValue>
+  metadata?: Record<string, JsonValue>
+}
+
+export type RawContentValue = ConversationContent | AgentTimelineContent | JsonObjectRawContent
 
 export const RawContent = {
   conversation(messages: MessageValue[]): ConversationContent {

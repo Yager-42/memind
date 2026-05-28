@@ -20,11 +20,16 @@ from scripts.lib.identity import project_slug, resolve_identity
 
 
 class IdentityTest(unittest.TestCase):
-    def test_resolve_identity_uses_codex_project_agent(self):
+    def test_resolve_identity_uses_fixed_agent_id(self):
         with tempfile.TemporaryDirectory() as tmp:
-            identity = resolve_identity({"agentId": "codex", "agentIdMode": "project", "userId": "u"}, {"cwd": tmp})
+            identity = resolve_identity({"agentId": "coding-agent", "userId": "u"}, {"cwd": tmp})
         self.assertEqual(identity["userId"], "u")
-        self.assertTrue(identity["agentId"].startswith("codex__"))
+        self.assertEqual(identity["agentId"], "coding-agent")
+
+    def test_resolve_identity_defaults_to_shared_coding_agent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            identity = resolve_identity({"userId": "u"}, {"cwd": tmp})
+        self.assertEqual(identity["agentId"], "coding-agent")
 
     def test_project_slug_falls_back_to_path_hash(self):
         with tempfile.TemporaryDirectory() as tmp:

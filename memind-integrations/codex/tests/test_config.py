@@ -17,26 +17,42 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.lib.config import load_config, parse_bool, parse_list
+from scripts.lib.config import DEFAULT_SETTINGS, load_config, parse_bool, parse_list
 
 
 class ConfigTest(unittest.TestCase):
     def test_defaults_are_codex_specific(self):
         config = load_config(plugin_root=Path(__file__).resolve().parents[1], user_config_path="/missing", env={})
-        self.assertEqual(config["agentId"], "codex")
+        self.assertEqual(config["agentId"], "coding-agent")
         self.assertEqual(config["sourceClient"], "codex")
-        self.assertFalse(config["commitOnStop"])
         self.assertEqual(config["retrieveContextTurns"], 0)
+        self.assertFalse(DEFAULT_SETTINGS["autoPromptContext"])
+        self.assertEqual(DEFAULT_SETTINGS["promptContextProjectMinEntries"], 4)
+        self.assertEqual(DEFAULT_SETTINGS["promptContextGlobalFallbackEntries"], 3)
+        self.assertEqual(DEFAULT_SETTINGS["promptContextGlobalFallbackMinScore"], 0.65)
+        self.assertTrue(config["autoSessionContext"])
+        self.assertEqual(config["sessionContextRecentSessions"], 3)
+        self.assertEqual(config["sessionContextMaxItems"], 6)
+        self.assertEqual(config["sessionContextMaxChars"], 6000)
+        self.assertTrue(DEFAULT_SETTINGS["autoToolContext"])
+        self.assertEqual(DEFAULT_SETTINGS["toolContextMaxChars"], 3500)
+        self.assertEqual(DEFAULT_SETTINGS["toolContextEntryMaxChars"], 520)
+        self.assertEqual(DEFAULT_SETTINGS["toolContextMaxItems"], 6)
+        self.assertEqual(DEFAULT_SETTINGS["toolContextMinExactItems"], 2)
+        self.assertNotIn("agentIdMode", config)
+        self.assertNotIn("commitOnStop", config)
 
     def test_user_config_and_env_override_settings(self):
         with tempfile.TemporaryDirectory() as tmp:
             user_config = Path(tmp) / "codex.json"
-            user_config.write_text(json.dumps({"agentId": "custom", "commitOnStop": True}))
+            user_config.write_text(json.dumps({"agentId": "custom"}))
             env = {
                 "MEMIND_API_URL": "http://example.test",
-                "MEMIND_COMMIT_ON_STOP": "false",
                 "MEMIND_RETRIEVE_CONTEXT_TURNS": "2",
-                "MEMIND_INGESTION_ROLES": "user,assistant",
+                "MEMIND_AUTO_SESSION_CONTEXT": "false",
+                "MEMIND_SESSION_CONTEXT_RECENT_SESSIONS": "4",
+                "MEMIND_SESSION_CONTEXT_MAX_ITEMS": "5",
+                "MEMIND_SESSION_CONTEXT_MAX_CHARS": "3000",
             }
             config = load_config(
                 plugin_root=Path(__file__).resolve().parents[1],
@@ -45,14 +61,58 @@ class ConfigTest(unittest.TestCase):
             )
         self.assertEqual(config["agentId"], "custom")
         self.assertEqual(config["memindApiUrl"], "http://example.test")
-        self.assertFalse(config["commitOnStop"])
         self.assertEqual(config["retrieveContextTurns"], 2)
-        self.assertEqual(config["ingestionRoles"], ["user", "assistant"])
+        self.assertFalse(config["autoSessionContext"])
+        self.assertEqual(config["sessionContextRecentSessions"], 4)
+        self.assertEqual(config["sessionContextMaxItems"], 5)
+        self.assertEqual(config["sessionContextMaxChars"], 3000)
+        self.assertNotIn("agentIdMode", config)
+        self.assertNotIn("commitOnStop", config)
+        self.assertNotIn("ingestionRoles", config)
 
     def test_parse_helpers(self):
         self.assertTrue(parse_bool("yes"))
         self.assertFalse(parse_bool("0"))
         self.assertEqual(parse_list(" user, assistant ,, "), ["user", "assistant"])
+
+    def test_tool_context_env_overrides(self):
+        config = load_config(
+            plugin_root=Path(__file__).resolve().parents[1],
+            user_config_path=Path("/no/such/file"),
+            env={
+                "CODEX_PLUGIN_ROOT": str(Path(__file__).resolve().parents[1]),
+                "MEMIND_AUTO_TOOL_CONTEXT": "false",
+                "MEMIND_TOOL_CONTEXT_MAX_CHARS": "2500",
+                "MEMIND_TOOL_CONTEXT_ENTRY_MAX_CHARS": "400",
+                "MEMIND_TOOL_CONTEXT_MAX_ITEMS": "4",
+                "MEMIND_TOOL_CONTEXT_MIN_EXACT_ITEMS": "1",
+            },
+        )
+
+        self.assertFalse(config["autoToolContext"])
+        self.assertEqual(config["toolContextMaxChars"], 2500)
+        self.assertEqual(config["toolContextEntryMaxChars"], 400)
+        self.assertEqual(config["toolContextMaxItems"], 4)
+        self.assertEqual(config["toolContextMinExactItems"], 1)
+
+    def test_prompt_context_env_overrides(self):
+        root = Path(__file__).resolve().parents[1]
+        config = load_config(
+            plugin_root=root,
+            user_config_path=Path("/no/such/file"),
+            env={
+                "CODEX_PLUGIN_ROOT": str(root),
+                "MEMIND_AUTO_PROMPT_CONTEXT": "true",
+                "MEMIND_PROMPT_CONTEXT_PROJECT_MIN_ENTRIES": "2",
+                "MEMIND_PROMPT_CONTEXT_GLOBAL_FALLBACK_ENTRIES": "1",
+                "MEMIND_PROMPT_CONTEXT_GLOBAL_FALLBACK_MIN_SCORE": "0.5",
+            },
+        )
+
+        self.assertTrue(config["autoPromptContext"])
+        self.assertEqual(config["promptContextProjectMinEntries"], 2)
+        self.assertEqual(config["promptContextGlobalFallbackEntries"], 1)
+        self.assertEqual(config["promptContextGlobalFallbackMinScore"], 0.5)
 
 
 if __name__ == "__main__":

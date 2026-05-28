@@ -15,15 +15,35 @@ package com.openmemind.ai.client.model.request;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.openmemind.ai.client.model.common.Strategy;
+import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record RetrieveMemoryRequest(
-        String userId, String agentId, String query, Strategy strategy, Boolean trace) {
+        String userId,
+        String agentId,
+        String query,
+        Strategy strategy,
+        Boolean trace,
+        String scope,
+        List<String> categories,
+        TimeRange timeRange,
+        MetadataFilter metadataFilter,
+        IncludeOptions include) {
 
     public static Builder builder() {
         return new Builder();
     }
+
+    public RetrieveMemoryRequest(
+            String userId, String agentId, String query, Strategy strategy, Boolean trace) {
+        this(userId, agentId, query, strategy, trace, null, null, null, null, null);
+    }
+
+    public record TimeRange(String field, Instant from, Instant to) {}
+
+    public record IncludeOptions(Boolean rawDataMetadata, Boolean rawDataSegment) {}
 
     public static final class Builder {
 
@@ -32,6 +52,11 @@ public record RetrieveMemoryRequest(
         private String query;
         private Strategy strategy;
         private Boolean trace;
+        private String scope;
+        private List<String> categories;
+        private TimeRange timeRange;
+        private MetadataFilter metadataFilter;
+        private IncludeOptions include;
 
         public Builder userId(String userId) {
             this.userId = userId;
@@ -58,12 +83,47 @@ public record RetrieveMemoryRequest(
             return this;
         }
 
+        public Builder scope(String scope) {
+            this.scope = scope;
+            return this;
+        }
+
+        public Builder categories(List<String> categories) {
+            this.categories = categories;
+            return this;
+        }
+
+        public Builder timeRange(TimeRange timeRange) {
+            this.timeRange = timeRange;
+            return this;
+        }
+
+        public Builder metadataFilter(MetadataFilter metadataFilter) {
+            this.metadataFilter = metadataFilter;
+            return this;
+        }
+
+        public Builder include(IncludeOptions include) {
+            this.include = include;
+            return this;
+        }
+
         public RetrieveMemoryRequest build() {
             Objects.requireNonNull(userId, "userId");
             Objects.requireNonNull(agentId, "agentId");
             Objects.requireNonNull(query, "query");
             Objects.requireNonNull(strategy, "strategy");
-            return new RetrieveMemoryRequest(userId, agentId, query, strategy, trace);
+            return new RetrieveMemoryRequest(
+                    userId,
+                    agentId,
+                    query,
+                    strategy,
+                    trace,
+                    scope,
+                    categories,
+                    timeRange,
+                    metadataFilter,
+                    include);
         }
     }
 }

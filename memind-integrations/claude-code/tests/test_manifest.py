@@ -27,20 +27,45 @@ class ManifestTest(unittest.TestCase):
 
     def test_hooks_json_shape(self):
         hooks = json.loads((ROOT / "hooks" / "hooks.json").read_text())["hooks"]
-        for event in ["SessionStart", "UserPromptSubmit", "PreCompact", "Stop", "SessionEnd"]:
+        for event in [
+            "SessionStart",
+            "UserPromptSubmit",
+            "PreToolUse",
+            "PostToolUse",
+            "Notification",
+            "SubagentStop",
+            "PreCompact",
+            "Stop",
+            "SessionEnd",
+        ]:
             self.assertIn(event, hooks)
             event_hooks = hooks[event]
             self.assertIsInstance(event_hooks, list)
             self.assertNotIn("matcher", event_hooks[0])
             self.assertIn("hooks", event_hooks[0])
         stop_command = hooks["Stop"][0]["hooks"][0]
+        pre_tool_hook = hooks["PreToolUse"][0]["hooks"][0]
         self.assertTrue(stop_command["async"])
+        self.assertNotIn("async", pre_tool_hook)
+        self.assertLessEqual(pre_tool_hook["timeout"], 5)
+        self.assertTrue(hooks["PostToolUse"][0]["hooks"][0]["async"])
+        self.assertTrue(hooks["Notification"][0]["hooks"][0]["async"])
+        self.assertTrue(hooks["SubagentStop"][0]["hooks"][0]["async"])
+        self.assertEqual(hooks["Notification"][0]["hooks"][0]["timeout"], 5)
+        self.assertEqual(hooks["SubagentStop"][0]["hooks"][0]["timeout"], 5)
 
     def test_default_settings(self):
         settings = json.loads((ROOT / "settings.json").read_text())
         self.assertEqual(settings["retrieveContextTurns"], 0)
-        self.assertEqual(settings["ingestionMode"], "extract-sync")
-        self.assertEqual(settings["ingestionMaxMessagesPerHook"], 20)
+        self.assertFalse(settings["autoPromptContext"])
+        self.assertEqual(settings["promptContextProjectMinEntries"], 4)
+        self.assertEqual(settings["promptContextGlobalFallbackEntries"], 3)
+        self.assertEqual(settings["promptContextGlobalFallbackMinScore"], 0.65)
+        self.assertTrue(settings["autoIngestAgentTimeline"])
+        self.assertNotIn("agentIdMode", settings)
+        self.assertNotIn("autoIngest", settings)
+        self.assertNotIn("ingestionRoles", settings)
+        self.assertNotIn("ingestionMaxMessagesPerHook", settings)
         self.assertEqual(settings["stateMaxAgeDays"], 14)
 
 

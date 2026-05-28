@@ -69,12 +69,22 @@ def _valid_memind_package(root):
             "MemindClient",
             "ConversationContent",
             "Message",
+            "QueryMemoryItemsRequest",
+            "QueryMemoryRawDataRequest",
+            "RawDataQueryIncludeOptions",
             "Strategy",
         ],
     )
 
 
 class InstallerTest(unittest.TestCase):
+    def test_remote_install_file_list_includes_context_compiler(self):
+        install_script = (ROOT / "install.sh").read_text()
+
+        self.assertIn('"scripts/lib/context_compiler.py"', install_script)
+        self.assertIn('"scripts/lib/prompt_context.py"', install_script)
+        self.assertIn('"scripts/lib/tool_context.py"', install_script)
+
     def test_install_merges_and_reinstall_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tmp:
             hooks_path = Path(tmp) / "hooks.json"
@@ -87,6 +97,18 @@ class InstallerTest(unittest.TestCase):
             self.assertIn("echo existing", stop_commands)
             memind_commands = [command for command in stop_commands if "memind-integrations/codex" in command]
             self.assertEqual(len(memind_commands), 1)
+            memind_events = {
+                event
+                for event, groups in hooks.items()
+                for group in groups
+                for hook in group.get("hooks", [])
+                if "memind-integrations/codex" in hook.get("command", "")
+                or "/memind/codex/" in hook.get("command", "")
+            }
+            self.assertEqual(
+                memind_events,
+                {"SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"},
+            )
 
     def test_uninstall_removes_only_memind_entries(self):
         with tempfile.TemporaryDirectory() as tmp:

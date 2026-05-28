@@ -143,13 +143,12 @@ public class ItemTierRetriever implements ItemTierSearch {
                                 }
 
                                 scoredResults.add(
-                                        new ScoredResult(
-                                                        ScoredResult.SourceType.ITEM,
-                                                        String.valueOf(item.id()),
-                                                        formatItemText(item),
-                                                        vr.score(),
-                                                        finalScore)
-                                                .withOccurredAt(item.occurredAt()));
+                                        ScoredResult.fromItem(
+                                                item,
+                                                formatItemText(item),
+                                                vr.score(),
+                                                finalScore,
+                                                item.occurredAt()));
 
                                 if (item.rawDataId() != null) {
                                     rawDataIds.add(item.rawDataId());
@@ -249,13 +248,12 @@ public class ItemTierRetriever implements ItemTierSearch {
                                 }
 
                                 scoredResults.add(
-                                        new ScoredResult(
-                                                        ScoredResult.SourceType.ITEM,
-                                                        String.valueOf(item.id()),
-                                                        formatItemText(item),
-                                                        vr.score(),
-                                                        finalScore)
-                                                .withOccurredAt(item.occurredAt()));
+                                        ScoredResult.fromItem(
+                                                item,
+                                                formatItemText(item),
+                                                vr.score(),
+                                                finalScore,
+                                                item.occurredAt()));
                                 if (item.rawDataId() != null) {
                                     rawDataIds.add(item.rawDataId());
                                 }
@@ -415,8 +413,11 @@ public class ItemTierRetriever implements ItemTierSearch {
                             List<ScoredResult> decayed =
                                     TimeDecay.applyToBm25Only(withTime, context, scoring);
 
-                            log.debug("searchByKeyword completed: {} results", decayed.size());
-                            return decayed;
+                            List<ScoredResult> filtered =
+                                    RawDataAggregator.filterItems(decayed, context, memoryStore);
+
+                            log.debug("searchByKeyword completed: {} results", filtered.size());
+                            return filtered;
                         })
                 .onErrorResume(
                         e -> {
