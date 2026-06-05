@@ -51,13 +51,16 @@
 
 ## 🏆 Highlights
 
-**Memind** achieves **state-of-the-art results across all three benchmarks**: LoCoMo, LongMemEval, and PersonaMem.
+**Memind** achieves **state-of-the-art results across all three mainstream long-memory benchmarks**: LoCoMo, LongMemEval, and PersonaMem.
 
-- ☕ **The first Java-native SOTA memory and context engine for AI agents:** built natively in Java, memind brings state-of-the-art long-memory performance into the Java ecosystem.
-- 🚀 **Highest reported results across all three benchmarks:** achieved **86.88%** on **LoCoMo**, **84.20%** on **LongMemEval**, and **67.91%** on **PersonaMem** under aligned **MemOS / EverMemOS-style** evaluation.
-- 📈 **Stronger than the strongest published baselines:** surpassed **EverMemOS** on **LoCoMo** and **LongMemEval**, and exceeded **MemOS** on **PersonaMem**.
-- 🌳 **Insight Tree turns memory into structured understanding:** instead of flat fact storage, memind organizes memory into hierarchical knowledge that evolves over time. See [Insight Tree](#insight-tree).
-- 🔬 **Full benchmark details:** see the [Benchmark](#benchmark) section for complete tables, category-level comparisons, context tokens, and evaluation protocol.
+- ☕ **The first Java-native SOTA memory and context engine for AI agents:** built natively in Java, memind brings benchmark-leading long-memory performance into the Java ecosystem.
+- 🚀 **Highest reported results across all three benchmarks:** under aligned **MemOS / EverMemOS-style evaluation**, memind ranks **#1 among the listed baselines** on **LoCoMo**, **LongMemEval**, and **PersonaMem**, surpassing **EverMemOS** on **LoCoMo** and **LongMemEval** and exceeding **MemOS** on **PersonaMem**. See [Benchmark](#benchmark) for full scores, category-level comparisons, context tokens, and evaluation protocol.
+- 🧩 **One memory engine for users and agents:** memind separates USER memory from AGENT memory, letting the same system remember user profiles, preferences, and life context while also preserving agent directives, tool experience, playbooks, and resolved-task knowledge across coding agents, local harness agents, chatbots, companions, copilots, and workflow agents.
+- 🌳 **Insight Tree turns memory into evolving intelligence:** instead of storing isolated facts, memind continuously distills raw memories into Leaf → Branch → Root insights, revealing patterns, preferences, causal signals, and high-level understanding that flat memory cannot capture. See [Insight Tree](#insight-tree).
+- 🔎 **Multi-layer retrieval recalls the right context:** memind retrieves across Insight Trees, Memory Items, raw source data, Memory Graphs, Memory Threads, vector search, BM25 keyword search, temporal signals, and optional Deep Retrieval with query expansion, sufficiency checking, and reranking.
+- 📥 **Memory for every kind of context:** memind can ingest conversations, documents, images, audio, tool calls, and agent timelines, then uses typed processors, parsers, chunkers, captioners, and plugin-specific extraction strategies to turn them into searchable memory.
+- 🕸️ **Memory Graph connects scattered context:** memind materializes entities, mentions, semantic links, temporal links, causal links, aliases, and co-occurrence signals from extracted memories, then uses graph expansion to recover related context that pure vector similarity can miss.
+- 🧵 **Memory Thread preserves evolving tasks and episodes:** memind groups related memory items into durable threads with timeline events, memberships, lifecycle state, enrichment, and retrieval-time thread assist, helping agents continue unfinished work and reuse resolved task history.
 
 ## Overview
 

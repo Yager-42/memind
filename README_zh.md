@@ -50,13 +50,16 @@
 
 ## 🏆 亮点
 
-**Memind** 在三项长记忆基准测试上都取得了 **SOTA** 结果：**LoCoMo**、**LongMemEval** 和 **PersonaMem**。
+**Memind** 在三项主流长记忆基准测试上都取得了 **SOTA** 结果：**LoCoMo**、**LongMemEval** 和 **PersonaMem**。
 
 - ☕ **首个达到 SOTA 水平的 Java 原生记忆与上下文引擎：** memind 基于 Java 原生构建，让 Java 生态也拥有可验证、可落地的长记忆能力。
-- 🚀 **三项 benchmark 的已公开最高结果：** 在与 **MemOS / EverMemOS** 对齐的评测口径下，**LoCoMo** 达到 **86.88%**，**LongMemEval** 达到 **84.20%**，**PersonaMem** 达到 **67.91%**。
-- 📈 **超过当前最强已发布基线：** 在 **LoCoMo** 和 **LongMemEval** 上超过 **EverMemOS**，在 **PersonaMem** 上超过 **MemOS**。
-- 🌳 **Insight Tree 把“记忆存储”变成“结构化理解”：** memind 不只是堆事实，而是把知识组织成会持续演化的层级结构。详见 [Insight Tree](#insight-tree)。
-- 🔬 **完整 benchmark 结果：** 详见 [基准测试](#benchmark) 区域，包括完整对比表、分项结果、上下文 Token 和评测协议。
+- 🚀 **三项 benchmark 的已公开最高结果：** 在与 **MemOS / EverMemOS** 对齐的评测口径下，memind 在 **LoCoMo**、**LongMemEval** 和 **PersonaMem** 的已列出基线中均排名 **#1**，其中在 **LoCoMo** 和 **LongMemEval** 上超过 **EverMemOS**，在 **PersonaMem** 上超过 **MemOS**。完整分数、分项对比、上下文 Token 和评测协议见 [基准测试](#benchmark)。
+- 🧩 **一套引擎，同时记住用户和 Agent：** memind 区分 USER memory 和 AGENT memory，既能记住用户画像、偏好与生活上下文，也能沉淀 Agent 指令、工具经验、可复用 playbook 和已解决任务知识，可覆盖 coding agent、本地 harness agent、chatbot、陪伴型应用、copilot 和工作流 Agent 等场景。
+- 🌳 **Insight Tree 让记忆进化成理解：** memind 不只是保存孤立事实，而是持续将原始记忆提炼为 Leaf → Branch → Root 洞察，发现扁平记忆无法捕捉的模式、偏好、因果信号和高层理解。详见 [Insight Tree](#insight-tree)。
+- 🔎 **多层检索召回正确上下文：** memind 会跨 Insight Tree、Memory Item、原始 source data、Memory Graph、Memory Thread、向量检索、BM25 关键词检索、时间信号，以及可选的 Deep Retrieval 查询扩展、充分性检查和重排序来召回上下文。
+- 📥 **记住各种类型的上下文：** memind 不只支持对话，还可以摄取文档、图片、音频、工具调用和 Agent 时间线，并通过类型化 processor、parser、chunker、captioner 和插件专属提取策略，将它们转化为可检索记忆。
+- 🕸️ **Memory Graph 连接分散上下文：** memind 会从提取出的记忆中构建实体、mention、语义链接、时间链接、因果链接、别名和共现信号，并在检索时通过 graph expansion 找回单纯向量相似度可能漏掉的相关上下文。
+- 🧵 **Memory Thread 保留持续演化的任务与事件脉络：** memind 会把相关 memory items 组织成持久线程，维护时间线事件、成员关系、生命周期状态、线程 enrichment 和 retrieval-time thread assist，帮助 Agent 延续未完成工作并复用已解决任务历史。
 
 <a id="overview"></a>
 
